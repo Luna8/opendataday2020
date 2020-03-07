@@ -1,0 +1,82 @@
+---
+title: "OpenData"
+author: "Ana Cristina Soto Rojas"
+date: "3/7/2020"
+output: html_document
+---
+
+```{r setup, warning = FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+library(gdalUtils)
+library(rgdal)
+library(rmapshaper)
+library(sf)
+library(raster)
+library(tidyverse)
+library(leaflet)
+library(osmdata)
+library(tmap)
+```
+# Lectura de capas
+
+A continuación vamos a guardar el URL en un objeto y listar las capas del mismo. Importante que el nombre de algunas capas cambia al que se muestra en SNIT.
+```{r}
+dsn_inec <- "WFS:http://mapassociales.inec.cr/geopc?service=wfs"
+ #Lista de capas disponibles en el WFS
+
+ogrListLayers(dsn_inec) 
+```
+
+# Importar capas
+
+Una capa se leyó directamente del shapefile de manera local, dado que la lectura de R no leyó correctamente los metadatos. Queda pendiente investigar la razón. La otra capa se leyó de SNIT.
+
+```{r}
+casasCulturales <- st_read("~/Documents/OpenData/CasasCulturales.shp") #
+
+bienestar <- st_read(dsn_inec, "Inec:distribucion_del_indice_de_bienestar_de_la_ninez_y_la_adolescencia__477___2017_01_14_11_01_23__Distritos_Mapas_Sociales__477_2017_01_14")
+
+casasCulturales <- casasCulturales %>%  st_transform(crs = "+init=epsg:4326") 
+bienestar <- bienestar %>%  st_transform(crs = "+init=epsg:4326") 
+
+```
+
+
+```{r}
+
+paleta_colores <- colorNumeric(
+  palette = 'Greens',
+  domain = bienestar$VALOR) #paleta de colores para el mapa, definida en la variable nom_cant
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lat = 10, lng = -84, zoom = 9) %>%
+  addPolygons(data = bienestar, 
+              fillColor = ~paleta_colores(bienestar$VALOR),
+              popup = paste0("<strong> Índice de bienestar: </strong>", 
+                              bienestar$VALOR,
+                              "<br><strong>","Nombre",": ","</strong>",
+                              bienestar$nombre),
+              color = "black",
+              fillOpacity = 0.5,
+              opacity = 1,
+              weight = 2,
+              group = "BIENESTAR",
+              highlight = highlightOptions(weight = 2,
+                                           color = "blue")) %>% #agrega poligonos
+  addCircleMarkers(data = casasCulturales,
+               popup = paste0("<strong> Nombre: </strong>", 
+                              casasCulturales$title),
+               radius = 5,
+               stroke = FALSE,
+               color = "red",
+               fillOpacity = 1,
+               opacity = 1,
+               group = "Casas") %>%
+  addLayersControl(overlayGroups = c("BIENESTAR", "Casas"),
+                       options = layersControlOptions(collapsed = TRUE)) %>% 
+  addLegend(pal=paleta_colores,values = bienestar$VALOR,opacity = 1) #control de capa en la esquina superior derecha, los grupos deben coincidir con los definidos arriba en el parametro group
+  
+```
+```
+
